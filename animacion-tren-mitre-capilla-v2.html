@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Línea Mitre · Victoria – Capilla del Señor</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    * { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    html, body { height: 100%; width: 100%; margin: 0; padding: 0; overflow: hidden; background-color: #020617; }
+    #map { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
+
+    .train-ball {
+      width: 24px; height: 24px; border-radius: 9999px; border: 2.5px solid #ffffff;
+      display: flex; align-items: center; justify-content: center; transition: transform 0.08s linear;
+    }
+    .train-ball-arrow { width: 12px; height: 12px; display: block; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.85)); }
+
+    .train-ball-cardales { background-color: #2563eb; box-shadow: 0 0 15px rgba(37,99,235,1), 0 0 5px #ffffff; }
+    .train-ball-matheu   { background-color: #f59e0b; box-shadow: 0 0 15px rgba(245,158,11,1), 0 0 5px #ffffff; }
+
+    .closed-station-badge {
+      width: 22px; height: 22px; border-radius: 9999px; background-color: #dc2626;
+      border: 2px solid #ffffff; color: #ffffff; font-weight: 800; font-size: 12px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 12px rgba(220, 38, 38, 0.9);
+    }
+
+    .leaflet-tooltip.cabecera-label {
+      background-color: rgba(2, 6, 23, 0.92); color: #f8fafc;
+      border: 1.5px solid rgba(56, 189, 248, 0.8); border-radius: 6px;
+      padding: 2.5px 8px; font-size: 11.5px; font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75); white-space: nowrap;
+    }
+    .leaflet-tooltip.cabecera-label::before,
+    .leaflet-tooltip.station-label::before,
+    .leaflet-tooltip.closed-label::before { display: none; }
+
+    .leaflet-tooltip.station-label {
+      background-color: rgba(15, 23, 42, 0.86); color: #f1f5f9;
+      border: 1px solid rgba(148, 163, 184, 0.45); border-radius: 5px;
+      padding: 2px 6.5px; font-size: 10px; font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.65); white-space: nowrap;
+    }
+
+    .leaflet-tooltip.closed-label {
+      background-color: rgba(127, 29, 29, 0.92); color: #fecaca;
+      border: 1.5px solid rgba(248, 113, 113, 0.85); border-radius: 6px;
+      padding: 2.5px 8px; font-size: 10.5px; font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75); white-space: nowrap;
+    }
+
+    .leaflet-control-layers {
+      background-color: rgba(2, 6, 23, 0.85) !important; color: #f8fafc !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important; border-radius: 12px !important;
+      padding: 6px 10px !important; backdrop-filter: blur(8px);
+    }
+    .leaflet-control-layers-expanded label { color: #f8fafc !important; font-size: 11.5px !important; }
+
+    input[type="range"].clean-slider {
+      -webkit-appearance: none; appearance: none; background: rgba(148, 163, 184, 0.25);
+      height: 4px; border-radius: 9999px; outline: none;
+    }
+    input[type="range"].clean-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 12px; height: 12px;
+      border-radius: 9999px; background: #38bdf8; border: 2px solid #ffffff; cursor: pointer;
+    }
+  </style>
+</head>
+<body class="text-slate-100 select-none">
+
+  <div id="map"></div>
+
+  <header id="top-header" class="fixed top-3 left-3 right-3 z-20 flex justify-center pointer-events-none">
+    <div class="bg-slate-950/85 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3 shadow-2xl text-center max-w-2xl w-full pointer-events-auto space-y-1.5">
+      <div class="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+        <span class="inline-flex items-center gap-1.5 text-[10.5px] sm:text-xs font-extrabold uppercase tracking-wider px-2.5 sm:px-3 py-1 rounded-full bg-sky-400 text-slate-950 border border-sky-200 shadow">
+          <span class="w-2 h-2 rounded-full bg-slate-950 inline-block"></span>
+          <span>Todos los días</span>
+        </span>
+
+        <span class="inline-flex items-center gap-1.5 text-[10.5px] sm:text-xs font-extrabold uppercase tracking-wider px-2.5 sm:px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/45">
+          <span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+          <span>Diagrama especial por obras · Vig. 22/12/25</span>
+        </span>
+      </div>
+
+      <h1 class="text-sm sm:text-lg font-extrabold tracking-tight text-white leading-tight">
+        Línea Mitre · Victoria – Capilla del Señor
+      </h1>
+    </div>
+  </header>
+
+  <footer id="bottom-bar" class="fixed bottom-3 left-3 right-3 z-20 flex justify-center pointer-events-none">
+    <div class="w-full max-w-4xl bg-slate-950/85 backdrop-blur-md border border-white/15 rounded-2xl px-3.5 py-2.5 sm:px-5 sm:py-3 shadow-2xl pointer-events-auto space-y-2">
+
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div class="flex flex-wrap items-center justify-between sm:justify-start gap-2">
+          <button id="clock-toggle-btn" type="button" title="Pausar o reanudar" class="flex items-center gap-1.5 text-left cursor-pointer group">
+            <span id="clock-display" class="text-xl sm:text-2xl font-extrabold text-white tabular-nums tracking-tight group-hover:text-sky-300 transition">06:30:00</span>
+            <span id="play-state-badge" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-200 group-hover:bg-white/20 transition">❚❚</span>
+          </button>
+
+          <div class="inline-flex items-center bg-slate-900/90 border border-white/15 rounded-full p-0.5 gap-0.5" role="group">
+            <button type="button" data-speed="300" title="300x tiempo real (1 seg = 5 min)" class="speed-btn text-[10px] font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full bg-sky-500/30 text-sky-200 border border-sky-400/50 cursor-pointer transition">300x</button>
+            <button type="button" data-speed="500" title="500x tiempo real (1 seg = 8m 20s)" class="speed-btn text-[10px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full text-slate-300 hover:text-white cursor-pointer transition">500x</button>
+            <button type="button" data-speed="700" title="700x tiempo real (1 seg = 11m 40s)" class="speed-btn text-[10px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full text-slate-300 hover:text-white cursor-pointer transition">700x</button>
+            <button type="button" data-speed="900" title="900x tiempo real (1 seg = 15 min)" class="speed-btn text-[10px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full text-slate-300 hover:text-white cursor-pointer transition">900x</button>
+            <button type="button" data-speed="1200" title="1200x tiempo real (1 seg = 20 min)" class="speed-btn text-[10px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full text-slate-300 hover:text-white cursor-pointer transition">1200x</button>
+          </div>
+
+          <span id="active-count-pill" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 tabular-nums">
+            0 en circulación
+          </span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] sm:text-[11px] text-slate-300">
+          <span><strong class="text-white">Victoria–Los Cardales:</strong> 1h 23m–1h 26m (47,3 km)</span>
+          <span class="text-slate-600">•</span>
+          <span><strong class="text-white">Corto Matheu:</strong> 57m–1h 00m</span>
+        </div>
+      </div>
+
+      <input id="time-slider" type="range" min="0" max="1439" value="390" class="w-full clean-slider" />
+
+      <div class="pt-1 border-t border-white/10">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] sm:text-[11px]">
+            <span class="font-bold text-slate-200 tracking-tight">Trenes en movimiento (24 h)</span>
+            <span id="chart-subtitle" class="text-slate-400">20 servicios diarios · Todos los días (Capilla suspendida por obras)</span>
+          </div>
+          <button id="toggle-chart-btn" type="button" class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/10 hover:bg-white/15 text-slate-200 border border-white/15 cursor-pointer transition shrink-0">
+            Ocultar gráfico
+          </button>
+        </div>
+
+        <div id="chart-container" class="relative w-full h-[126px] sm:h-[138px] rounded-xl bg-slate-900/65 border border-white/10 overflow-hidden">
+          <canvas id="evolution-chart" class="w-full h-full block cursor-crosshair"></canvas>
+          <div id="chart-hover-tooltip" class="hidden pointer-events-none absolute z-30 bg-slate-950/95 border border-white/25 rounded-lg px-2.5 py-1.5 text-[10.5px] text-slate-100 shadow-xl backdrop-blur-md leading-snug"></div>
+        </div>
+      </div>
+
+      <div class="pt-1 border-t border-white/10 flex flex-wrap items-center justify-center sm:justify-between gap-x-3 gap-y-1.5 text-[11px] sm:text-xs font-medium text-slate-200">
+        <button type="button" data-filter-line="ALL" class="line-filter-btn flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/15 text-white font-bold ring-1 ring-white/30 cursor-pointer transition">
+          <span id="label-filter-all">Todos (20)</span>
+        </button>
+        <button type="button" data-filter-line="Victoria ↔ Los Cardales" class="line-filter-btn flex items-center gap-1.5 px-1.5 py-0.5 rounded-md hover:text-white cursor-pointer transition">
+          <span class="w-3 h-3 rounded-full bg-[#2563eb] border-2 border-white inline-block shadow"></span>
+          <span id="label-filter-cardales">Victoria ↔ Los Cardales (16)</span>
+        </button>
+        <button type="button" data-filter-line="Victoria ↔ Matheu" class="line-filter-btn flex items-center gap-1.5 px-1.5 py-0.5 rounded-md hover:text-white cursor-pointer transition">
+          <span class="w-3 h-3 rounded-full bg-[#f59e0b] border-2 border-white inline-block shadow"></span>
+          <span id="label-filter-matheu">Victoria ↔ Matheu (4)</span>
+        </button>
+        <span class="inline-flex items-center gap-1 text-[10.5px] text-red-300">
+          <span class="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-red-600 text-white text-[9px] font-extrabold border border-white">✕</span>
+          <span>Capilla del Señor (Obras)</span>
+        </span>
+        <span class="text-[10px] text-slate-500">· @mbattaglia07</span>
+      </div>
+
+    </div>
+  </footer>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    const googleHybridLayer = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: 'Map data &copy; Google', maxZoom: 20
+    });
+    const esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri', maxZoom: 18
+    });
+    const argenmapLayer = L.tileLayer('https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/capabaseargenmap@EPSG%3A3857@png/{z}/{x}/{-y}.png', {
+      attribution: 'IGN Argentina - Argenmap', minZoom: 3, maxZoom: 18
+    });
+
+    const map = L.map('map', { zoomControl: false, attributionControl: false, layers: [googleHybridLayer] }).setView([-34.38, -58.82], 11);
+    L.control.layers({ 'Google Hybrid': googleHybridLayer, 'Esri Satélite': esriSatelliteLayer, 'Argenmap (IGN)': argenmapLayer }, null, { position: 'topright' }).addTo(map);
+
+    let googleTileErrors = 0;
+    googleHybridLayer.on('tileerror', () => {
+      if (++googleTileErrors >= 6 && map.hasLayer(googleHybridLayer)) {
+        map.removeLayer(googleHybridLayer);
+        map.addLayer(esriSatelliteLayer);
+      }
+    });
+
+    const LINE_META = {
+      "Victoria ↔ Los Cardales": { color: "#2563eb", ballClass: "train-ball train-ball-cardales", bounds: [[-34.485, -59.115], [-34.280, -58.530]] },
+      "Victoria ↔ Matheu":       { color: "#f59e0b", ballClass: "train-ball train-ball-matheu",   bounds: [[-34.485, -58.850], [-34.375, -58.530]] }
+    };
+    const REGIONAL_BOUNDS = [[-34.485, -59.115], [-34.280, -58.530]];
+
+    const STATION_ORDER = ["Victoria", "Schweitzer", "El Talar", "López Camelo", "Garín", "Maq. Savio", "Matheu", "Zelaya", "Los Cardales", "Capilla del Señor"];
+    const STATIONS = {"Victoria": {"coords": [-34.45615, -58.54083], "terminal": true, "isMatheu": false, "closed": false, "labelDir": "right", "labelOffset": [10, 0]}, "Schweitzer": {"coords": [-34.47208, -58.57432], "terminal": false, "isMatheu": false, "closed": false, "labelDir": "bottom", "labelOffset": [0, 9]}, "El Talar": {"coords": [-34.46283, -58.64612], "terminal": false, "isMatheu": false, "closed": false, "labelDir": "top", "labelOffset": [0, -9]}, "López Camelo": {"coords": [-34.44692, -58.67721], "terminal": false, "isMatheu": false, "closed": false, "labelDir": "bottom", "labelOffset": [0, 9]}, "Garín": {"coords": [-34.42111, -58.73672], "terminal": false, "isMatheu": false, "closed": false, "labelDir": "top", "labelOffset": [0, -9]}, "Maq. Savio": {"coords": [-34.40682, -58.77201], "terminal": false, "isMatheu": false, "closed": false, "labelDir": "bottom", "labelOffset": [0, 9]}, "Matheu": {"coords": [-34.38281, -58.82962], "terminal": false, "isMatheu": true, "closed": false, "labelDir": "top", "labelOffset": [0, -9]}, "Zelaya": {"coords": [-34.37001, -58.86921], "terminal": false, "isMatheu": false, "closed": false, "labelDir": "bottom", "labelOffset": [0, 9]}, "Los Cardales": {"coords": [-34.33092, -58.98741], "terminal": true, "isMatheu": false, "closed": false, "labelDir": "top", "labelOffset": [0, -10]}, "Capilla del Señor": {"coords": [-34.29172, -59.09941], "terminal": false, "isMatheu": false, "closed": true, "labelDir": "top", "labelOffset": [0, -12]}};
+    const SEGMENT_WAYPOINTS = {"Victoria|Schweitzer": [[-34.45615, -58.54083], [-34.46062, -58.54251], [-34.46584, -58.54538], [-34.46935, -58.55145], [-34.47128, -58.56195], [-34.47208, -58.57432]], "Schweitzer|El Talar": [[-34.47208, -58.57432], [-34.47295, -58.5898], [-34.47348, -58.6074], [-34.47175, -58.62445], [-34.46748, -58.63675], [-34.46283, -58.64612]], "El Talar|López Camelo": [[-34.46283, -58.64612], [-34.45485, -58.66175], [-34.44692, -58.67721]], "López Camelo|Garín": [[-34.44692, -58.67721], [-34.43918, -58.69345], [-34.43045, -58.7145], [-34.42111, -58.73672]], "Garín|Maq. Savio": [[-34.42111, -58.73672], [-34.41398, -58.75442], [-34.40682, -58.77201]], "Maq. Savio|Matheu": [[-34.40682, -58.77201], [-34.39495, -58.80078], [-34.38281, -58.82962]], "Matheu|Zelaya": [[-34.38281, -58.82962], [-34.37645, -58.84945], [-34.37001, -58.86921]], "Zelaya|Los Cardales": [[-34.37001, -58.86921], [-34.35745, -58.90645], [-34.34442, -58.94695], [-34.33092, -58.98741]], "Los Cardales|Capilla del Señor": [[-34.33092, -58.98741], [-34.31748, -59.02595], [-34.30445, -59.06295], [-34.29172, -59.09941]]};
+    const SERVICES_BY_REGIME = {"all_days": [{"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2001", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "03:50", "llegada": "05:13", "depMins": 230, "duracionMin": 83, "stops": [{"name": "Victoria", "time": "03:50", "elapsed": 0}, {"name": "Schweitzer", "time": "03:59", "elapsed": 9}, {"name": "El Talar", "time": "04:18", "elapsed": 28}, {"name": "López Camelo", "time": "04:24", "elapsed": 34}, {"name": "Garín", "time": "04:32", "elapsed": 42}, {"name": "Maq. Savio", "time": "04:39", "elapsed": 49}, {"name": "Matheu", "time": "04:48", "elapsed": 58}, {"name": "Zelaya", "time": "04:55", "elapsed": 65}, {"name": "Los Cardales", "time": "05:13", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Matheu", "tren": "Tren 2003", "clase": "Corto · Sentido Norte (a Matheu)", "comb": "Servicio corto hasta Matheu", "origen": "Victoria", "destino": "Matheu", "salida": "05:56", "llegada": "06:56", "depMins": 356, "duracionMin": 60, "stops": [{"name": "Victoria", "time": "05:56", "elapsed": 0}, {"name": "Schweitzer", "time": "06:05", "elapsed": 9}, {"name": "El Talar", "time": "06:24", "elapsed": 28}, {"name": "López Camelo", "time": "06:33", "elapsed": 37}, {"name": "Garín", "time": "06:41", "elapsed": 45}, {"name": "Maq. Savio", "time": "06:48", "elapsed": 52}, {"name": "Matheu", "time": "06:56", "elapsed": 60}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2005", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "08:12", "llegada": "09:35", "depMins": 492, "duracionMin": 83, "stops": [{"name": "Victoria", "time": "08:12", "elapsed": 0}, {"name": "Schweitzer", "time": "08:21", "elapsed": 9}, {"name": "El Talar", "time": "08:40", "elapsed": 28}, {"name": "López Camelo", "time": "08:46", "elapsed": 34}, {"name": "Garín", "time": "08:54", "elapsed": 42}, {"name": "Maq. Savio", "time": "09:01", "elapsed": 49}, {"name": "Matheu", "time": "09:10", "elapsed": 58}, {"name": "Zelaya", "time": "09:17", "elapsed": 65}, {"name": "Los Cardales", "time": "09:35", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2007", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "10:10", "llegada": "11:36", "depMins": 610, "duracionMin": 86, "stops": [{"name": "Victoria", "time": "10:10", "elapsed": 0}, {"name": "Schweitzer", "time": "10:19", "elapsed": 9}, {"name": "El Talar", "time": "10:38", "elapsed": 28}, {"name": "López Camelo", "time": "10:47", "elapsed": 37}, {"name": "Garín", "time": "10:55", "elapsed": 45}, {"name": "Maq. Savio", "time": "11:02", "elapsed": 52}, {"name": "Matheu", "time": "11:11", "elapsed": 61}, {"name": "Zelaya", "time": "11:18", "elapsed": 68}, {"name": "Los Cardales", "time": "11:36", "elapsed": 86}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2009", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "12:10", "llegada": "13:36", "depMins": 730, "duracionMin": 86, "stops": [{"name": "Victoria", "time": "12:10", "elapsed": 0}, {"name": "Schweitzer", "time": "12:19", "elapsed": 9}, {"name": "El Talar", "time": "12:38", "elapsed": 28}, {"name": "López Camelo", "time": "12:47", "elapsed": 37}, {"name": "Garín", "time": "12:55", "elapsed": 45}, {"name": "Maq. Savio", "time": "13:02", "elapsed": 52}, {"name": "Matheu", "time": "13:11", "elapsed": 61}, {"name": "Zelaya", "time": "13:18", "elapsed": 68}, {"name": "Los Cardales", "time": "13:36", "elapsed": 86}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2011", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "14:14", "llegada": "15:37", "depMins": 854, "duracionMin": 83, "stops": [{"name": "Victoria", "time": "14:14", "elapsed": 0}, {"name": "Schweitzer", "time": "14:23", "elapsed": 9}, {"name": "El Talar", "time": "14:42", "elapsed": 28}, {"name": "López Camelo", "time": "14:48", "elapsed": 34}, {"name": "Garín", "time": "14:56", "elapsed": 42}, {"name": "Maq. Savio", "time": "15:03", "elapsed": 49}, {"name": "Matheu", "time": "15:12", "elapsed": 58}, {"name": "Zelaya", "time": "15:19", "elapsed": 65}, {"name": "Los Cardales", "time": "15:37", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2013", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "16:21", "llegada": "17:44", "depMins": 981, "duracionMin": 83, "stops": [{"name": "Victoria", "time": "16:21", "elapsed": 0}, {"name": "Schweitzer", "time": "16:30", "elapsed": 9}, {"name": "El Talar", "time": "16:49", "elapsed": 28}, {"name": "López Camelo", "time": "16:55", "elapsed": 34}, {"name": "Garín", "time": "17:03", "elapsed": 42}, {"name": "Maq. Savio", "time": "17:10", "elapsed": 49}, {"name": "Matheu", "time": "17:19", "elapsed": 58}, {"name": "Zelaya", "time": "17:26", "elapsed": 65}, {"name": "Los Cardales", "time": "17:44", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2015", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "17:46", "llegada": "19:09", "depMins": 1066, "duracionMin": 83, "stops": [{"name": "Victoria", "time": "17:46", "elapsed": 0}, {"name": "Schweitzer", "time": "17:55", "elapsed": 9}, {"name": "El Talar", "time": "18:14", "elapsed": 28}, {"name": "López Camelo", "time": "18:20", "elapsed": 34}, {"name": "Garín", "time": "18:28", "elapsed": 42}, {"name": "Maq. Savio", "time": "18:35", "elapsed": 49}, {"name": "Matheu", "time": "18:44", "elapsed": 58}, {"name": "Zelaya", "time": "18:51", "elapsed": 65}, {"name": "Los Cardales", "time": "19:09", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2017", "clase": "Completo · Sentido Norte (a Los Cardales)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Victoria", "destino": "Los Cardales", "salida": "19:55", "llegada": "21:18", "depMins": 1195, "duracionMin": 83, "stops": [{"name": "Victoria", "time": "19:55", "elapsed": 0}, {"name": "Schweitzer", "time": "20:04", "elapsed": 9}, {"name": "El Talar", "time": "20:23", "elapsed": 28}, {"name": "López Camelo", "time": "20:29", "elapsed": 34}, {"name": "Garín", "time": "20:37", "elapsed": 42}, {"name": "Maq. Savio", "time": "20:44", "elapsed": 49}, {"name": "Matheu", "time": "20:53", "elapsed": 58}, {"name": "Zelaya", "time": "21:00", "elapsed": 65}, {"name": "Los Cardales", "time": "21:18", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Matheu", "tren": "Tren 2019", "clase": "Corto · Sentido Norte (a Matheu)", "comb": "Servicio corto hasta Matheu", "origen": "Victoria", "destino": "Matheu", "salida": "21:55", "llegada": "22:52", "depMins": 1315, "duracionMin": 57, "stops": [{"name": "Victoria", "time": "21:55", "elapsed": 0}, {"name": "Schweitzer", "time": "22:04", "elapsed": 9}, {"name": "El Talar", "time": "22:23", "elapsed": 28}, {"name": "López Camelo", "time": "22:29", "elapsed": 34}, {"name": "Garín", "time": "22:37", "elapsed": 42}, {"name": "Maq. Savio", "time": "22:44", "elapsed": 49}, {"name": "Matheu", "time": "22:52", "elapsed": 57}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2002", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "05:42", "llegada": "07:05", "depMins": 342, "duracionMin": 83, "stops": [{"name": "Los Cardales", "time": "05:42", "elapsed": 0}, {"name": "Zelaya", "time": "06:01", "elapsed": 19}, {"name": "Matheu", "time": "06:08", "elapsed": 26}, {"name": "Maq. Savio", "time": "06:17", "elapsed": 35}, {"name": "Garín", "time": "06:24", "elapsed": 42}, {"name": "López Camelo", "time": "06:32", "elapsed": 50}, {"name": "El Talar", "time": "06:38", "elapsed": 56}, {"name": "Schweitzer", "time": "06:57", "elapsed": 75}, {"name": "Victoria", "time": "07:05", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Matheu", "tren": "Tren 2004", "clase": "Corto · Sentido Sur (a Victoria)", "comb": "Servicio corto hasta Matheu", "origen": "Matheu", "destino": "Victoria", "salida": "07:13", "llegada": "08:10", "depMins": 433, "duracionMin": 57, "stops": [{"name": "Matheu", "time": "07:13", "elapsed": 0}, {"name": "Maq. Savio", "time": "07:22", "elapsed": 9}, {"name": "Garín", "time": "07:29", "elapsed": 16}, {"name": "López Camelo", "time": "07:37", "elapsed": 24}, {"name": "El Talar", "time": "07:43", "elapsed": 30}, {"name": "Schweitzer", "time": "08:02", "elapsed": 49}, {"name": "Victoria", "time": "08:10", "elapsed": 57}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2006", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "09:56", "llegada": "11:19", "depMins": 596, "duracionMin": 83, "stops": [{"name": "Los Cardales", "time": "09:56", "elapsed": 0}, {"name": "Zelaya", "time": "10:15", "elapsed": 19}, {"name": "Matheu", "time": "10:22", "elapsed": 26}, {"name": "Maq. Savio", "time": "10:31", "elapsed": 35}, {"name": "Garín", "time": "10:38", "elapsed": 42}, {"name": "López Camelo", "time": "10:46", "elapsed": 50}, {"name": "El Talar", "time": "10:52", "elapsed": 56}, {"name": "Schweitzer", "time": "11:11", "elapsed": 75}, {"name": "Victoria", "time": "11:19", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2008", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "11:56", "llegada": "13:19", "depMins": 716, "duracionMin": 83, "stops": [{"name": "Los Cardales", "time": "11:56", "elapsed": 0}, {"name": "Zelaya", "time": "12:15", "elapsed": 19}, {"name": "Matheu", "time": "12:22", "elapsed": 26}, {"name": "Maq. Savio", "time": "12:31", "elapsed": 35}, {"name": "Garín", "time": "12:38", "elapsed": 42}, {"name": "López Camelo", "time": "12:46", "elapsed": 50}, {"name": "El Talar", "time": "12:52", "elapsed": 56}, {"name": "Schweitzer", "time": "13:11", "elapsed": 75}, {"name": "Victoria", "time": "13:19", "elapsed": 83}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2010", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "13:56", "llegada": "15:22", "depMins": 836, "duracionMin": 86, "stops": [{"name": "Los Cardales", "time": "13:56", "elapsed": 0}, {"name": "Zelaya", "time": "14:15", "elapsed": 19}, {"name": "Matheu", "time": "14:22", "elapsed": 26}, {"name": "Maq. Savio", "time": "14:31", "elapsed": 35}, {"name": "Garín", "time": "14:38", "elapsed": 42}, {"name": "López Camelo", "time": "14:49", "elapsed": 53}, {"name": "El Talar", "time": "14:55", "elapsed": 59}, {"name": "Schweitzer", "time": "15:14", "elapsed": 78}, {"name": "Victoria", "time": "15:22", "elapsed": 86}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2012", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "16:03", "llegada": "17:29", "depMins": 963, "duracionMin": 86, "stops": [{"name": "Los Cardales", "time": "16:03", "elapsed": 0}, {"name": "Zelaya", "time": "16:22", "elapsed": 19}, {"name": "Matheu", "time": "16:29", "elapsed": 26}, {"name": "Maq. Savio", "time": "16:38", "elapsed": 35}, {"name": "Garín", "time": "16:45", "elapsed": 42}, {"name": "López Camelo", "time": "16:56", "elapsed": 53}, {"name": "El Talar", "time": "17:02", "elapsed": 59}, {"name": "Schweitzer", "time": "17:21", "elapsed": 78}, {"name": "Victoria", "time": "17:29", "elapsed": 86}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2014", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "18:16", "llegada": "19:42", "depMins": 1096, "duracionMin": 86, "stops": [{"name": "Los Cardales", "time": "18:16", "elapsed": 0}, {"name": "Zelaya", "time": "18:35", "elapsed": 19}, {"name": "Matheu", "time": "18:45", "elapsed": 29}, {"name": "Maq. Savio", "time": "18:54", "elapsed": 38}, {"name": "Garín", "time": "19:01", "elapsed": 45}, {"name": "López Camelo", "time": "19:09", "elapsed": 53}, {"name": "El Talar", "time": "19:15", "elapsed": 59}, {"name": "Schweitzer", "time": "19:34", "elapsed": 78}, {"name": "Victoria", "time": "19:42", "elapsed": 86}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2016", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "19:37", "llegada": "21:03", "depMins": 1177, "duracionMin": 86, "stops": [{"name": "Los Cardales", "time": "19:37", "elapsed": 0}, {"name": "Zelaya", "time": "19:56", "elapsed": 19}, {"name": "Matheu", "time": "20:03", "elapsed": 26}, {"name": "Maq. Savio", "time": "20:12", "elapsed": 35}, {"name": "Garín", "time": "20:19", "elapsed": 42}, {"name": "López Camelo", "time": "20:30", "elapsed": 53}, {"name": "El Talar", "time": "20:36", "elapsed": 59}, {"name": "Schweitzer", "time": "20:55", "elapsed": 78}, {"name": "Victoria", "time": "21:03", "elapsed": 86}]}, {"regime": "all_days", "linea": "Victoria ↔ Los Cardales", "tren": "Tren 2018", "clase": "Completo · Sentido Sur (a Victoria)", "comb": "Capilla del Señor sin servicio por obras", "origen": "Los Cardales", "destino": "Victoria", "salida": "21:37", "llegada": "23:03", "depMins": 1297, "duracionMin": 86, "stops": [{"name": "Los Cardales", "time": "21:37", "elapsed": 0}, {"name": "Zelaya", "time": "21:56", "elapsed": 19}, {"name": "Matheu", "time": "22:03", "elapsed": 26}, {"name": "Maq. Savio", "time": "22:12", "elapsed": 35}, {"name": "Garín", "time": "22:19", "elapsed": 42}, {"name": "López Camelo", "time": "22:30", "elapsed": 53}, {"name": "El Talar", "time": "22:36", "elapsed": 59}, {"name": "Schweitzer", "time": "22:55", "elapsed": 78}, {"name": "Victoria", "time": "23:03", "elapsed": 86}]}, {"regime": "all_days", "linea": "Victoria ↔ Matheu", "tren": "Tren 2020", "clase": "Corto · Sentido Sur (a Victoria)", "comb": "Servicio corto hasta Matheu", "origen": "Matheu", "destino": "Victoria", "salida": "23:11", "llegada": "00:08", "depMins": 1391, "duracionMin": 57, "stops": [{"name": "Matheu", "time": "23:11", "elapsed": 0}, {"name": "Maq. Savio", "time": "23:20", "elapsed": 9}, {"name": "Garín", "time": "23:27", "elapsed": 16}, {"name": "López Camelo", "time": "23:35", "elapsed": 24}, {"name": "El Talar", "time": "23:41", "elapsed": 30}, {"name": "Schweitzer", "time": "00:00", "elapsed": 49}, {"name": "Victoria", "time": "00:08", "elapsed": 57}]}]};
+
+    function getDirectSubPolyline(stA, stB) {
+      const forwardKey = `${stA}|${stB}`;
+      if (SEGMENT_WAYPOINTS[forwardKey]) return SEGMENT_WAYPOINTS[forwardKey];
+      const reverseKey = `${stB}|${stA}`;
+      if (SEGMENT_WAYPOINTS[reverseKey]) return [...SEGMENT_WAYPOINTS[reverseKey]].reverse();
+      return [STATIONS[stA].coords, STATIONS[stB].coords];
+    }
+
+    function getPolylineBetweenStations(stA, stB) {
+      const idxA = STATION_ORDER.indexOf(stA);
+      const idxB = STATION_ORDER.indexOf(stB);
+      if (idxA === -1 || idxB === -1 || idxA === idxB) return getDirectSubPolyline(stA, stB);
+      const step = idxA < idxB ? 1 : -1;
+      const full = [];
+      for (let i = idxA; i !== idxB; i += step) {
+        const seg = getDirectSubPolyline(STATION_ORDER[i], STATION_ORDER[i + step]);
+        if (full.length === 0) full.push(...seg);
+        else full.push(...seg.slice(1));
+      }
+      return full;
+    }
+
+    function formatMinutes(totalMins) {
+      const m = ((Math.floor(totalMins) % 1440) + 1440) % 1440;
+      return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    }
+
+    function formatClockWithSeconds(totalMins) {
+      const totalSecs = ((Math.floor(totalMins * 60) % 86400) + 86400) % 86400;
+      const hh = Math.floor(totalSecs / 3600);
+      const mm = Math.floor((totalSecs % 3600) / 60);
+      const ss = totalSecs % 60;
+      return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+    }
+
+    function computeSegmentHeadingDeg(p1, p2) {
+      const midLatRad = (((p1[0] + p2[0]) / 2) * Math.PI) / 180;
+      const dx = (p2[1] - p1[1]) * Math.cos(midLatRad);
+      const dy = p2[0] - p1[0];
+      if (Math.abs(dx) < 1e-12 && Math.abs(dy) < 1e-12) return 0;
+      return ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
+    }
+
+    function offsetLateralStarboard(pos, headingDeg, lateralMeters) {
+      const rightBearingRad = ((headingDeg + 90) * Math.PI) / 180;
+      const latRad = (pos[0] * Math.PI) / 180;
+      const dLat = (lateralMeters * Math.cos(rightBearingRad)) / 111320;
+      const dLon = (lateralMeters * Math.sin(rightBearingRad)) / (111320 * Math.max(0.2, Math.cos(latRad)));
+      return [pos[0] + dLat, pos[1] + dLon];
+    }
+
+    function interpolateAlongPolyline(pts, frac) {
+      if (pts.length === 1) return { pos: pts[0], headingDeg: 0 };
+      const segLens = [];
+      let totalLen = 0;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const dLat = pts[i + 1][0] - pts[i][0];
+        const dLon = (pts[i + 1][1] - pts[i][1]) * Math.cos(((pts[i][0] + pts[i + 1][0]) * Math.PI) / 360);
+        const len = Math.hypot(dLat, dLon);
+        segLens.push(len);
+        totalLen += len;
+      }
+      const target = Math.max(0, Math.min(1, frac)) * totalLen;
+      let acc = 0;
+      for (let i = 0; i < segLens.length; i++) {
+        if (acc + segLens[i] >= target || i === segLens.length - 1) {
+          const localFrac = segLens[i] > 0 ? (target - acc) / segLens[i] : 0;
+          const pA = pts[i];
+          const pB = pts[i + 1];
+          return {
+            pos: [pA[0] + (pB[0] - pA[0]) * localFrac, pA[1] + (pB[1] - pA[1]) * localFrac],
+            headingDeg: computeSegmentHeadingDeg(pA, pB)
+          };
+        }
+        acc += segLens[i];
+      }
+      return { pos: pts[pts.length - 1], headingDeg: 0 };
+    }
+
+    function getElapsedIfActive(service, normalizedMins) {
+      const dep = service.depMins;
+      const end = dep + service.duracionMin;
+      if (normalizedMins >= dep && normalizedMins <= end) {
+        return normalizedMins - dep;
+      }
+      if (end > 1440 && (normalizedMins + 1440) <= end) {
+        return (normalizedMins + 1440) - dep;
+      }
+      return null;
+    }
+
+    function getTrainPositionAtElapsed(service, elapsedMin) {
+      const stops = service.stops;
+      for (let i = 0; i < stops.length - 1; i++) {
+        const sCurr = stops[i];
+        const sNext = stops[i + 1];
+        if (elapsedMin >= sCurr.elapsed && elapsedMin <= sNext.elapsed) {
+          const span = Math.max(1, sNext.elapsed - sCurr.elapsed);
+          const frac = (elapsedMin - sCurr.elapsed) / span;
+          const pts = getPolylineBetweenStations(sCurr.name, sNext.name);
+          const interp = interpolateAlongPolyline(pts, frac);
+          return {
+            pos: offsetLateralStarboard(interp.pos, interp.headingDeg, 125),
+            headingDeg: interp.headingDeg,
+            statusText: `Tramo: ${sCurr.name} → ${sNext.name} (llega ${sNext.time})`
+          };
+        }
+      }
+      return null;
+    }
+
+    const routesLayer = L.layerGroup().addTo(map);
+    const stationsLayer = L.layerGroup().addTo(map);
+    const activeMarkersLayer = L.layerGroup().addTo(map);
+
+    let activeRegime = 'all_days';
+    let speedMultiplier = 300;
+    let lineFilter = 'ALL';
+    let simMinutes = 6 * 60 + 30;
+    let isPlaying = true;
+    let lastTimestamp = performance.now();
+
+    function getActiveServices() {
+      return SERVICES_BY_REGIME[activeRegime] || [];
+    }
+
+    function updateRegimeCountsUI() {
+      const svcs = getActiveServices();
+      const total = svcs.length;
+      const cardalesCount = svcs.filter((s) => s.linea === 'Victoria ↔ Los Cardales').length;
+      const matheuCount = svcs.filter((s) => s.linea === 'Victoria ↔ Matheu').length;
+
+      document.getElementById('label-filter-all').textContent = `Todos (${total})`;
+      document.getElementById('label-filter-cardales').textContent = `Victoria ↔ Los Cardales (${cardalesCount})`;
+      document.getElementById('label-filter-matheu').textContent = `Victoria ↔ Matheu (${matheuCount})`;
+    }
+
+    function fitMapBounds(animate = true) {
+      const headerEl = document.getElementById('top-header');
+      const bottomEl = document.getElementById('bottom-bar');
+      const topPad = (headerEl ? headerEl.offsetHeight : 76) + 28;
+      const bottomPad = (bottomEl ? bottomEl.offsetHeight : 150) + 28;
+      const targetBounds = lineFilter === 'ALL' ? L.latLngBounds(REGIONAL_BOUNDS) : L.latLngBounds(LINE_META[lineFilter].bounds);
+      if (animate) map.flyToBounds(targetBounds, { paddingTopLeft: [36, topPad], paddingBottomRight: [36, bottomPad], duration: 0.75 });
+      else map.fitBounds(targetBounds, { paddingTopLeft: [36, topPad], paddingBottomRight: [36, bottomPad], animate: false });
+    }
+
+    function renderNetworkGeometry() {
+      routesLayer.clearLayers();
+      stationsLayer.clearLayers();
+
+      const activeTrack = getPolylineBetweenStations("Victoria", "Los Cardales");
+      const shortTrack = getPolylineBetweenStations("Victoria", "Matheu");
+      const closedTrack = getPolylineBetweenStations("Los Cardales", "Capilla del Señor");
+
+      // Traza operativa base
+      L.polyline(activeTrack, { color: '#020617', weight: 8, opacity: 0.85 }).addTo(routesLayer);
+
+      // Tramo suspendido por obras (Los Cardales -> Capilla del Señor)
+      L.polyline(closedTrack, { color: '#020617', weight: 6, opacity: 0.65 }).addTo(routesLayer);
+      L.polyline(closedTrack, { color: '#94a3b8', weight: 2.8, opacity: 0.75, dashArray: '7 7' }).addTo(routesLayer);
+
+      if (lineFilter === 'Victoria ↔ Matheu') {
+        L.polyline(activeTrack, { color: '#64748b', weight: 2.6, opacity: 0.45 }).addTo(routesLayer);
+        L.polyline(shortTrack, { color: '#f59e0b', weight: 4.8, opacity: 0.96 }).addTo(routesLayer);
+      } else {
+        L.polyline(activeTrack, { color: '#2563eb', weight: 4.6, opacity: 0.94 }).addTo(routesLayer);
+        if (lineFilter === 'ALL') {
+          L.polyline(shortTrack, { color: '#f59e0b', weight: 2.3, opacity: 0.88, dashArray: '6 6' }).addTo(routesLayer);
+        }
+      }
+
+      Object.entries(STATIONS).forEach(([name, st]) => {
+        if (st.closed) {
+          const closedIcon = L.divIcon({
+            className: '',
+            html: `<div class="closed-station-badge">✕</div>`,
+            iconSize: [22, 22], iconAnchor: [11, 11]
+          });
+          L.marker(st.coords, { icon: closedIcon })
+            .bindTooltip(`${name} (Sin servicio por obras)`, {
+              permanent: true,
+              direction: st.labelDir || 'top',
+              offset: st.labelOffset || [0, -12],
+              className: 'closed-label'
+            })
+            .addTo(stationsLayer);
+        } else if (st.terminal) {
+          const marker = L.circleMarker(st.coords, { radius: 6.5, color: '#020617', weight: 2, fillColor: '#38bdf8', fillOpacity: 1 });
+          marker.bindTooltip(name, { permanent: true, direction: st.labelDir || 'top', offset: st.labelOffset || [0, -10], className: 'cabecera-label' });
+          marker.addTo(stationsLayer);
+        } else {
+          const highlightMatheu = st.isMatheu;
+          const stMarker = L.circleMarker(st.coords, {
+            radius: highlightMatheu ? 5.2 : 4.2,
+            color: '#020617',
+            weight: 1.8,
+            fillColor: highlightMatheu ? '#f59e0b' : '#ffffff',
+            fillOpacity: 1
+          });
+          stMarker.bindTooltip(name, { permanent: true, direction: st.labelDir || 'left', offset: st.labelOffset || [-10, 0], className: 'station-label' });
+          stMarker.addTo(stationsLayer);
+        }
+      });
+    }
+
+    const CHART_SERIES_CONFIG = [
+      { key: "Victoria ↔ Los Cardales", linea: "Victoria ↔ Los Cardales", label: "Victoria ↔ Los Cardales", strokeColor: "#2563eb", dotFill: "#2563eb", dotBorder: "#ffffff", dy: -0.8 },
+      { key: "Victoria ↔ Matheu",       linea: "Victoria ↔ Matheu",       label: "Victoria ↔ Matheu",       strokeColor: "#f59e0b", dotFill: "#f59e0b", dotBorder: "#ffffff", dy: 0.8 }
+    ];
+
+    let evolutionSeriesCache = [];
+    let chartYMax = 3;
+
+    function countTrainsAtMinute(normalizedMins) {
+      const counts = { total: 0 };
+      CHART_SERIES_CONFIG.forEach((s) => { counts[s.key] = 0; });
+      getActiveServices().forEach((svc) => {
+        if (lineFilter !== 'ALL' && svc.linea !== lineFilter) return;
+        if (getElapsedIfActive(svc, normalizedMins) !== null) {
+          counts[svc.linea] = (counts[svc.linea] || 0) + 1;
+          counts.total += 1;
+        }
+      });
+      return counts;
+    }
+
+    function rebuildEvolutionCache() {
+      evolutionSeriesCache = [];
+      let peak = 2;
+      for (let m = 0; m <= 1440; m += 2) {
+        const evalMin = m === 1440 ? 1439 : m;
+        const c = countTrainsAtMinute(evalMin);
+        if (c.total > peak) peak = c.total;
+        evolutionSeriesCache.push({ minute: m, ...c });
+      }
+      chartYMax = Math.max(2, peak);
+    }
+
+    function drawEvolutionChart(normalizedMins, liveCounts) {
+      const canvas = document.getElementById("evolution-chart");
+      const container = document.getElementById("chart-container");
+      if (!canvas || !container || container.classList.contains("hidden")) return;
+
+      const rect = container.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.floor(rect.width);
+      const height = Math.floor(rect.height);
+      if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+      }
+
+      const ctx = canvas.getContext("2d");
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, width, height);
+
+      const padLeft = 28, padRight = 14, padTop = 18, padBottom = 20;
+      const plotW = Math.max(40, width - padLeft - padRight);
+      const plotH = Math.max(24, height - padTop - padBottom);
+
+      const yMax = chartYMax;
+      const xForMinute = (m) => padLeft + (m / 1440) * plotW;
+      const yForValue = (v) => padTop + plotH - (v / yMax) * plotH;
+
+      ctx.font = "600 9.5px Inter, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let v = 0; v <= yMax; v++) {
+        const y = Math.round(yForValue(v)) + 0.5;
+        ctx.strokeStyle = v === 0 ? "rgba(148,163,184,0.35)" : "rgba(148,163,184,0.16)";
+        ctx.lineWidth = v === 0 ? 1.1 : 0.8;
+        ctx.beginPath(); ctx.moveTo(padLeft, y); ctx.lineTo(padLeft + plotW, y); ctx.stroke();
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillText(String(v), padLeft - 6, y);
+      }
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let h = 0; h <= 24; h += 3) {
+        const m = h === 24 ? 1440 : h * 60;
+        const x = Math.round(xForMinute(m)) + 0.5;
+        ctx.strokeStyle = "rgba(148,163,184,0.16)";
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(x, padTop); ctx.lineTo(x, padTop + plotH); ctx.stroke();
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillText(h === 24 ? "23:59" : `${String(h).padStart(2, "0")}:00`, x, padTop + plotH + 4);
+      }
+
+      const visibleSeries = CHART_SERIES_CONFIG.filter((s) => lineFilter === 'ALL' || s.linea === lineFilter);
+      visibleSeries.forEach((s) => {
+        ctx.beginPath();
+        evolutionSeriesCache.forEach((pt, idx) => {
+          const x = xForMinute(pt.minute);
+          const y = yForValue(pt[s.key] || 0) + s.dy;
+          if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(xForMinute(1440), yForValue(0));
+        ctx.lineTo(xForMinute(0), yForValue(0));
+        ctx.closePath();
+        ctx.fillStyle = `${s.strokeColor}22`;
+        ctx.fill();
+
+        ctx.beginPath();
+        evolutionSeriesCache.forEach((pt, idx) => {
+          const x = xForMinute(pt.minute);
+          const y = yForValue(pt[s.key] || 0) + s.dy;
+          if (idx === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = s.strokeColor;
+        ctx.lineWidth = 2.3;
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      });
+
+      const cursorX = xForMinute(normalizedMins);
+      ctx.save();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.6;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(cursorX, padTop - 3); ctx.lineTo(cursorX, padTop + plotH); ctx.stroke();
+      ctx.restore();
+
+      visibleSeries.forEach((s) => {
+        const cy = yForValue(liveCounts[s.key] || 0) + s.dy;
+        ctx.beginPath(); ctx.arc(cursorX, cy, 4.2, 0, Math.PI * 2);
+        ctx.fillStyle = s.dotFill; ctx.fill();
+        ctx.lineWidth = 1.6; ctx.strokeStyle = s.dotBorder; ctx.stroke();
+      });
+
+      const badgeText = `${formatMinutes(normalizedMins)} · ${liveCounts.total} tren${liveCounts.total === 1 ? "" : "es"}`;
+      ctx.font = "700 9.5px Inter, sans-serif";
+      const pillW = ctx.measureText(badgeText).width + 12;
+      const pillX = Math.max(padLeft, Math.min(padLeft + plotW - pillW, cursorX - pillW / 2));
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath(); ctx.roundRect(pillX, 1, pillW, 15, 5); ctx.fill();
+      ctx.fillStyle = "#020617"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(badgeText, pillX + pillW / 2, 9);
+      ctx.restore();
+    }
+
+    function renderFrame() {
+      activeMarkersLayer.clearLayers();
+      const normalizedMins = ((simMinutes % 1440) + 1440) % 1440;
+      document.getElementById('clock-display').textContent = formatClockWithSeconds(normalizedMins);
+      document.getElementById('time-slider').value = Math.floor(normalizedMins);
+
+      let activeCount = 0;
+      getActiveServices().forEach((svc) => {
+        if (lineFilter !== 'ALL' && svc.linea !== lineFilter) return;
+        const elapsed = getElapsedIfActive(svc, normalizedMins);
+        if (elapsed !== null) {
+          const posInfo = getTrainPositionAtElapsed(svc, elapsed);
+          if (!posInfo) return;
+          activeCount += 1;
+          const meta = LINE_META[svc.linea];
+          const ballIcon = L.divIcon({
+            className: '',
+            html: `<div class="${meta.ballClass}" style="transform: rotate(${posInfo.headingDeg.toFixed(1)}deg);">
+              <svg class="train-ball-arrow" viewBox="0 0 12 12" fill="none"><path d="M6 1L10.5 10.5L6 8.2L1.5 10.5L6 1Z" fill="#ffffff"/></svg>
+            </div>`,
+            iconSize: [24, 24], iconAnchor: [12, 12]
+          });
+
+          const combHtml = svc.comb ? `<br/><span style="color:#7dd3fc;font-size:10px;">${svc.comb}</span>` : '';
+          L.marker(posInfo.pos, { icon: ballIcon })
+            .bindTooltip(
+              `<strong>${svc.tren} · ${svc.linea}</strong><br/><span style="color:#cbd5e1;font-size:10.5px;">${svc.clase}</span><br/>${svc.origen} → ${svc.destino} (${svc.salida} – ${svc.llegada})<br/><span style="color:#fde68a;">${posInfo.statusText}</span>${combHtml}`,
+              { direction: 'top', offset: [0, -13] }
+            )
+            .addTo(activeMarkersLayer);
+        }
+      });
+
+      document.getElementById('active-count-pill').textContent = `${activeCount} en circulación`;
+      drawEvolutionChart(normalizedMins, countTrainsAtMinute(normalizedMins));
+    }
+
+    function loop(timestamp) {
+      const dtSeconds = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+      if (isPlaying) {
+        simMinutes = (simMinutes + (dtSeconds * speedMultiplier) / 60) % 1440;
+        renderFrame();
+      }
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('load', () => {
+      updateRegimeCountsUI();
+      rebuildEvolutionCache();
+      renderNetworkGeometry();
+      fitMapBounds(false);
+
+      window.addEventListener('resize', () => { fitMapBounds(false); renderFrame(); });
+
+      document.getElementById('toggle-chart-btn').addEventListener('click', (e) => {
+        const container = document.getElementById('chart-container');
+        const isHidden = container.classList.toggle('hidden');
+        e.target.textContent = isHidden ? 'Ver gráfico 24h' : 'Ocultar gráfico';
+        fitMapBounds(true);
+        if (!isHidden) renderFrame();
+      });
+
+      const evoCanvas = document.getElementById('evolution-chart');
+      const evoTooltip = document.getElementById('chart-hover-tooltip');
+      function minuteFromCanvasEvent(e) {
+        const rect = evoCanvas.getBoundingClientRect();
+        const plotW = Math.max(40, rect.width - 42);
+        return Math.round((Math.max(0, Math.min(plotW, e.clientX - rect.left - 28)) / plotW) * 1439);
+      }
+
+      evoCanvas.addEventListener('click', (e) => { simMinutes = minuteFromCanvasEvent(e); renderFrame(); });
+      evoCanvas.addEventListener('mousemove', (e) => {
+        const hoverMin = minuteFromCanvasEvent(e);
+        const counts = countTrainsAtMinute(hoverMin);
+        const rect = evoCanvas.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        const rows = CHART_SERIES_CONFIG.filter((s) => lineFilter === 'ALL' || s.linea === lineFilter).map((s) =>
+          `<div class="flex items-center justify-between gap-3"><span class="inline-flex items-center gap-1.5"><span style="width:8px;height:8px;border-radius:9999px;display:inline-block;background:${s.dotFill};border:1.5px solid #fff;"></span><span>${s.label}</span></span><strong>${counts[s.key] || 0}</strong></div>`
+        ).join('');
+        evoTooltip.innerHTML = `<div class="font-bold text-white border-b border-white/15 pb-0.5 mb-1">${formatMinutes(hoverMin)} · Total: ${counts.total}</div>${rows}`;
+        evoTooltip.style.left = `${Math.max(8, localX > rect.width - 210 ? localX - 200 : localX + 12)}px`;
+        evoTooltip.style.top = `6px`;
+        evoTooltip.classList.remove('hidden');
+      });
+      evoCanvas.addEventListener('mouseleave', () => evoTooltip.classList.add('hidden'));
+
+      document.querySelectorAll('.line-filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          lineFilter = btn.getAttribute('data-filter-line');
+          document.querySelectorAll('.line-filter-btn').forEach((b) => {
+            if (b.getAttribute('data-filter-line') === lineFilter) b.classList.add('bg-white/15', 'text-white', 'font-bold', 'ring-1', 'ring-white/30');
+            else b.classList.remove('bg-white/15', 'text-white', 'font-bold', 'ring-1', 'ring-white/30');
+          });
+          rebuildEvolutionCache();
+          renderNetworkGeometry();
+          fitMapBounds(true);
+          renderFrame();
+        });
+      });
+
+      document.getElementById('clock-toggle-btn').addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        document.getElementById('play-state-badge').textContent = isPlaying ? '❚❚' : '▶';
+      });
+
+      document.querySelectorAll('.speed-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          speedMultiplier = Number(btn.getAttribute('data-speed'));
+          document.querySelectorAll('.speed-btn').forEach((b) => {
+            b.className = Number(b.getAttribute('data-speed')) === speedMultiplier
+              ? 'speed-btn text-[10px] font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full bg-sky-500/30 text-sky-200 border border-sky-400/50 cursor-pointer transition'
+              : 'speed-btn text-[10px] font-bold px-2 sm:px-2.5 py-0.5 rounded-full text-slate-300 hover:text-white cursor-pointer transition';
+          });
+        });
+      });
+
+      document.getElementById('time-slider').addEventListener('input', (e) => {
+        simMinutes = Number(e.target.value);
+        renderFrame();
+      });
+
+      renderFrame();
+      lastTimestamp = performance.now();
+      requestAnimationFrame(loop);
+    });
+  </script>
+</body>
+</html>
